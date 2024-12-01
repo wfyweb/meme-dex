@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id  String @id @default(uuid())
+  nonce  String
+  mnemonic  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+ id     String @id @default(uuid())
+ userId String
+ password  String?
+ type      String // telegram,  email,  wallet:eth wallet:sol wallet:ton
+ uniqueId  String @unique
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@unique([userId, type, uniqueId])
+ @@index([userId])
+}
+
+
+model StaticData {
+  id   String @id @default(uuid())
+  chain    String     // 链： sol
+  symbol   String     // 代币名称
+  address     String  // 合约地址
+  open_timestamp  DateTime  // 时间
+  renounced_mint  Int?  // Mint丢弃 1: 是  0: 否
+  frozen  Int?  // 黑名单 1: 是  0: 否
+  burn_status  String?  // 烧池子  'burn'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dynamicData  DynamicData[] @relation("StaticDynamic")
+} 
+
+model DynamicData {
+  id        String @id @default(uuid())
+  staticId  String // 对应基本信息的id
+  staticData      StaticData   @relation("StaticDynamic", fields: [staticId], references: [id]) // 关系定义
+  liquidity       Decimal @db.Decimal(15, 2) // 池子
+  market_cap      Decimal @db.Decimal(15, 2) // 市值字段
+  holder_count    Int                // 持币数
+  price           Decimal @db.Decimal(25, 18) // 价格
+  swaps           Int   // 交易数
+  volume          Int   // 交易额
+  sells           Int  // 卖
+  buys            Int  // 买
+  distribed  Int?  // Top10持仓  0.189105
+  insider_rate  Int?  // 老鼠仓百分比   0.2
+  creator_token_status String? // DEV持仓 
+  dev_token_burn_ratio Int?  // dev烧池子百分比   0.001
+} 
