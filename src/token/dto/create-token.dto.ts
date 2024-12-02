@@ -139,7 +139,7 @@ export class CreateRankSwapDto {
   @ApiProperty({
     description: '安全监测,Dev 多选查询字段： burn:烧池子 distribed: Top10 frozen: 黑名单 renounced： Mint丢弃 ，creator_hold:DEV 未清仓 creator_close:DEV 清仓 token_burnt：DEV 烧币',
     required: false, 
-    example: '100000', 
+    example: ['burn', '，creator_hold'], 
   })
   @IsOptional()
   @IsArray()

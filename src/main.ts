@@ -14,6 +14,7 @@ async function bootstrap() {
   .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
+  app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // 自动剔除非装饰器定义的属性
