@@ -31,21 +31,23 @@ export class CreateEmailDto {
 export class CreateAddressDto {
     @ApiProperty({
         description: '钱包地址',
-        example: '0xRf92a67192fBbFfC2d01HB6FfF0445aB70006187',
+        // example: 'BgTkrowL9zCub7HRdg534qkNUnmQq1Szj72CK8hh7nxQ',
+        example: '24PNhTaNtomHhoy3fTRaMhAFCRj4uHqhZEEoWrKDbR5p',
         required: false,
     })
     @IsString()
     'address': string;
     @ApiProperty({
         description: '签名信息',
-        example: '',
+        example: 'welcome',
         required: false,
     })
     @IsString()
     'message': string;
     @ApiProperty({
         description: '签名内容',
-        example: '',
+        // example: '7FZDZ5Q325faRSGkkyG0w105eAchMCpNOfKLNjcCnWBGgXQUpknYL5ZSK65uZjfhEErloFJKqggGV+rSPHMECw==',
+        example: 'w/iJ9q3IvB3noyQKAPdatBA/f90IgPN0AibxzjmCUgbkh+Dp83DpPyrSEBfN/GL75Qws6skY/2SqAc0N138WCQ==',
         required: false,
     })
     @IsString()
