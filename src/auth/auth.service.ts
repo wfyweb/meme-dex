@@ -6,6 +6,7 @@ import { ethers } from 'ethers';
 import { PublicKey } from "@solana/web3.js";
 import { sign } from "tweetnacl";
 import { decodeUTF8 } from "tweetnacl-util";
+const token = '"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZGRyZXNzIjoiMm0xeE1rcjZMM0JWN3ptQWt1UHJrTWN6am41MzN4aTRNcG9tbkQ5WDJLbXAiLCJhdWQiOiJnbWduLmFpL2FjY2VzcyIsImNoYWluIjoic29sIiwiZXhwIjoxNzMzMjE3MTk3LCJpYXQiOjE3MzMyMTYyOTcsImlzcyI6ImdtZ24uYWkvc2lnbmVyIiwic3ViIjoiZ21nbi5haS9hY2Nlc3MiLCJ2ZXJzaW9uIjoiMi4wIn0.OF5XR-2IdkdBLHooiGcc-yqXlcg-9hXlURB0Y2aKSsohjA_zauzCwWqhCdlXroJusDJHrirEBA7qCy11XYYLyQ"'
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) { }
@@ -122,6 +123,7 @@ export class AuthService {
             return {
               code: 0,
               msg: 'Login successful',
+              data: { token }
             }
           } else {
             throw new HttpException('verify message fail.', 400);
@@ -163,6 +165,7 @@ export class AuthService {
             return {
               code: 0,
               msg: 'Login successful',
+              data: { token }
             }
           } else {
             throw new HttpException('verify message fail.', 400);
