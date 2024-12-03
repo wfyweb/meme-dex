@@ -32,22 +32,21 @@ export class CreateAddressDto {
     @ApiProperty({
         description: '钱包地址',
         // example: 'BgTkrowL9zCub7HRdg534qkNUnmQq1Szj72CK8hh7nxQ',
-        example: '24PNhTaNtomHhoy3fTRaMhAFCRj4uHqhZEEoWrKDbR5p',
+        example: '2m1xMkr6L3BV7zmAkuPrkMczjn533xi4MpomnD9X2Kmp',
         required: false,
     })
     @IsString()
     'address': string;
     @ApiProperty({
         description: '签名信息',
-        example: 'welcome',
+        example: 'meme-dex wants you to sign in with your Solana wallet_sign_statement \naccount:24PNhTaNtomHhoy3fTRaMhAFCRj4uHqhZEEoWrKDbR5p\nnonce: qpllchiq',
         required: false,
     })
     @IsString()
     'message': string;
     @ApiProperty({
         description: '签名内容',
-        // example: '7FZDZ5Q325faRSGkkyG0w105eAchMCpNOfKLNjcCnWBGgXQUpknYL5ZSK65uZjfhEErloFJKqggGV+rSPHMECw==',
-        example: 'w/iJ9q3IvB3noyQKAPdatBA/f90IgPN0AibxzjmCUgbkh+Dp83DpPyrSEBfN/GL75Qws6skY/2SqAc0N138WCQ==',
+        example: 'uGCxw8U4Tx5kMwLwBvobjETGjgGlVk4m/iku4rX+q7gBu+KNQHEtRLw061f0KIXTL0Jv/u3OeVDNxpNUnctdAg==',
         required: false,
     })
     @IsString()
