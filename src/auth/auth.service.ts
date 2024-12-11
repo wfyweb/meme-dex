@@ -1,15 +1,16 @@
 import { Injectable, HttpException } from '@nestjs/common';
-import { CreateAddressDto } from './dto/create-auth.dto';
+import { CreateAddressDto, CreateEmailDto } from './dto/create-auth.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { v4 } from 'uuid';
 import { ethers } from 'ethers';
-import { PublicKey } from "@solana/web3.js";
-import { sign } from "tweetnacl";
-import { decodeUTF8 } from "tweetnacl-util";
-const token = '"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZGRyZXNzIjoiMm0xeE1rcjZMM0JWN3ptQWt1UHJrTWN6am41MzN4aTRNcG9tbkQ5WDJLbXAiLCJhdWQiOiJnbWduLmFpL2FjY2VzcyIsImNoYWluIjoic29sIiwiZXhwIjoxNzMzMjE3MTk3LCJpYXQiOjE3MzMyMTYyOTcsImlzcyI6ImdtZ24uYWkvc2lnbmVyIiwic3ViIjoiZ21nbi5haS9hY2Nlc3MiLCJ2ZXJzaW9uIjoiMi4wIn0.OF5XR-2IdkdBLHooiGcc-yqXlcg-9hXlURB0Y2aKSsohjA_zauzCwWqhCdlXroJusDJHrirEBA7qCy11XYYLyQ"'
+import { PublicKey } from '@solana/web3.js';
+import { sign } from 'tweetnacl';
+import { decodeUTF8 } from 'tweetnacl-util';
+const token =
+  'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZGRyZXNzIjoiMm0xeE1rcjZMM0JWN3ptQWt1UHJrTWN6am41MzN4aTRNcG9tbkQ5WDJLbXAiLCJhdWQiOiJnbWduLmFpL2FjY2VzcyIsImNoYWluIjoic29sIiwiZXhwIjoxNzMzMjE3MTk3LCJpYXQiOjE3MzMyMTYyOTcsImlzcyI6ImdtZ24uYWkvc2lnbmVyIiwic3ViIjoiZ21nbi5haS9hY2Nlc3MiLCJ2ZXJzaW9uIjoiMi4wIn0.OF5XR-2IdkdBLHooiGcc-yqXlcg-9hXlURB0Y2aKSsohjA_zauzCwWqhCdlXroJusDJHrirEBA7qCy11XYYLyQ';
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
   isValidSolanaAddress(address: string) {
     try {
       // 尝试创建一个 PublicKey 对象
@@ -22,7 +23,7 @@ export class AuthService {
   // 获取用户noce
   async loginNonce(address: string) {
     // 生成nocne
-    const nonce = Math.floor(Math.random() * 1000000) + ''
+    const nonce = Math.floor(Math.random() * 1000000) + '';
     const addressRecord = await this.prisma.account.findFirst({
       where: {
         uniqueId: address,
@@ -43,11 +44,11 @@ export class AuthService {
             data: {
               userId,
               type: 'wallet',
-              uniqueId: address
+              uniqueId: address,
             },
           }),
-        ])
-      })
+        ]);
+      });
     } else {
       // 查到用户，更新nonce
       // await this.prisma.user.update({
@@ -62,13 +63,13 @@ export class AuthService {
     return {
       code: 0,
       nonce,
-    }
+    };
   }
   // 钱包验签
   async verifyMessage(CreateAddressDto: CreateAddressDto) {
-    const { address, message, signature } = CreateAddressDto
-    const nonce = Math.floor(Math.random() * 1000000) + ''
-    console.log(address, message, signature)
+    const { address, message, signature } = CreateAddressDto;
+    const nonce = Math.floor(Math.random() * 1000000) + '';
+    console.log('address', address, message, signature);
     try {
       const addressRecord = await this.prisma.account.findFirst({
         where: {
@@ -81,22 +82,23 @@ export class AuthService {
         return {
           code: 400,
           msg: 'The user was not found',
-        }
+        };
       }
-
 
       // 是否Solana链钱包
       if (this.isValidSolanaAddress(address)) {
-        console.log('start==> sol', addressRecord, message)
+        console.log('start==> sol', addressRecord, message);
         try {
           const pubKey = new PublicKey(address);
-          const signatureBuffer = new Uint8Array(Buffer.from(signature, 'base64')); // base64转化为Uint8Array格式
+          const signatureBuffer = new Uint8Array(
+            Buffer.from(signature, 'base64'),
+          ); // base64转化为Uint8Array格式
           // const _message  = `meme-dex wants you to sign in with your Solana account:\nGdS4cqHxVfEeQuoKc8CtXhYB1KFQRUiyyuFz52yT5on\nNonce: ${addressRecord}`
           const messageBytes = decodeUTF8(message);
           const isValid = sign.detached.verify(
             messageBytes,
             signatureBuffer,
-            pubKey.toBytes() // Uint8Array
+            pubKey.toBytes(), // Uint8Array
           );
           if (isValid) {
             // 查到用户，更新nonce, type
@@ -104,69 +106,71 @@ export class AuthService {
               return await Promise.all([
                 prisma.user.update({
                   where: {
-                    id: addressRecord.userId
+                    id: addressRecord.userId,
                   },
                   data: {
-                    nonce
-                  }
+                    nonce,
+                  },
                 }),
                 prisma.account.update({
                   where: {
                     id: addressRecord.id,
                   },
                   data: {
-                    type: 'wallet:sol'
-                  }
+                    type: 'wallet:sol',
+                  },
                 }),
-              ])
-            })
+              ]);
+            });
             return {
               code: 0,
               msg: 'Login successful',
-              data: { token }
-            }
+              data: { token },
+            };
           } else {
             throw new HttpException('verify message fail.', 400);
           }
         } catch (error) {
-
           // throw new HttpException(error, 400);
           return {
             code: 400,
             msg: error,
-          }
+          };
         }
       } else if (ethers.utils.isAddress(address)) {
         // eth 钱包
         try {
-          const recoveredAddress = ethers.utils.verifyMessage(message, signature)
+          const recoveredAddress = ethers.utils.verifyMessage(
+            message,
+            signature,
+          );
           if (recoveredAddress.toLowerCase() === address.toLowerCase()) {
             // 查到用户，更新nonce
             await this.prisma.$transaction(async (prisma) => {
               return await Promise.all([
                 prisma.user.update({
                   where: {
-                    id: addressRecord.userId
+                    id: addressRecord.userId,
                   },
                   data: {
-                    nonce
-                  }
+                    nonce,
+                  },
                 }),
                 prisma.account.update({
                   where: {
                     id: addressRecord.id,
                   },
                   data: {
-                    type: 'wallet:eth'
-                  }
+                    type: 'wallet:eth',
+                  },
                 }),
-              ])
-            })
+              ]);
+            });
             return {
               code: 0,
               msg: 'Login successful',
-              data: { token }
-            }
+              data: { token },
+            };
           } else {
             throw new HttpException('verify message fail.', 400);
           }
@@ -176,12 +180,141 @@ export class AuthService {
       } else {
         throw new HttpException('The wallet address is error.', 400);
       }
-
     } catch (error) {
       return {
         code: 400,
         msg: 'The user was not found',
+      };
+    }
+  }
+  // 用户生成邀请码
+  async generateReferralCode(userId: string) {
+    const userRecord = await this.prisma.user.findFirst({
+      where: { id: userId },
+    });
+    if (!userRecord) throw new Error('User not found');
+    if (!userRecord.referralCode) {
+      const referralCode = this.generateUniqueCode(); // 生成唯一代码逻辑
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          referralCode,
+        },
+      });
+      return {
+        code: 0,
+        data: referralCode,
+        msg: 'User ReferralCode',
+      };
+    } else {
+      return {
+        code: 0,
+        data: userRecord.referralCode,
+        msg: 'User ReferralCode',
+      };
+    }
+  }
+  // 注册账号 邀请码
+  async registerUser(CreateEmailDto: CreateEmailDto) {
+    const { email, password, referralCode } = CreateEmailDto;
+    const userId = v4();
+    // const referralCode = this.generateUniqueId(); // 生成唯一代码逻辑
+    const newUser = await this.prisma.$transaction(async (prisma) => {
+      return await Promise.all([
+        prisma.user.create({
+          data: {
+            id: userId,
+          },
+        }),
+        prisma.account.create({
+          data: {
+            userId,
+            type: 'email',
+            uniqueId: email,
+            password,
+          },
+        }),
+      ]);
+    });
+    // 如果有邀请码，将新用户的 referredBy 字段设置为推荐人的 ID
+    if (referralCode) {
+      const referrer = await this.prisma.user.findFirst({
+        where: { referralCode }, // 通过referralCode查询邀请人
+      });
+      if (referrer) {
+        await this.prisma.$transaction(async (prisma) => {
+          return await Promise.all([
+            prisma.user.update({
+              where: {
+                id: userId,
+              },
+              data: {
+                referredBy: referrer.id,
+              },
+            }),
+            prisma.referral.create({
+              data: {
+                userId: userId,
+                referralCode,
+                referredBy: referrer.id,
+              },
+            }),
+          ]);
+        });
+        await this.rewardUser(userId, referrer.id); // 奖励邀请人
       }
     }
+    return {
+      code: 0,
+      msg: 'register user success',
+      data: {
+        id: newUser[1].userId,
+        email: newUser[1].uniqueId,
+      },
+    };
+  }
+  private async rewardUser(userId: string, referrerId: string) {
+    const rewardAmount = 0; // 具体奖励金额
+    await this.prisma.reward.create({
+      data: {
+        userId: userId,
+        referredBy: referrerId,
+        amount: rewardAmount,
+      },
+    });
+  }
+  // 生成6位数邀请码
+  generateUniqueCode() {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    const length = 6;
+
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      result += characters[randomIndex];
+    }
+    return result;
+  }
+
+  async getReward(userId: string) {
+    const rewardRecord = await this.prisma.reward.findMany({
+      where: { referredBy: userId },
+    });
+
+    return {
+      code: 0,
+      data: rewardRecord,
+    };
+  }
+
+  async getReferral(userId: string) {
+    const referralRecord = await this.prisma.referral.findMany({
+      where: { referredBy: userId },
+    });
+    return {
+      code: 0,
+      data: referralRecord,
+    };
   }
 }
