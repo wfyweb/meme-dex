@@ -58,4 +58,12 @@ export class CreateAddressDto {
   })
   @IsString()
   'signature': string;
+  @ApiProperty({
+    description: '邀请码',
+    example: 'E80a',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  referralCode?: string; // 可选
 }

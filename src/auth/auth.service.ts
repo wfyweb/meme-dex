@@ -67,7 +67,7 @@ export class AuthService {
   }
   // 钱包验签
   async verifyMessage(CreateAddressDto: CreateAddressDto) {
-    const { address, message, signature } = CreateAddressDto;
+    const { address, message, signature, referralCode } = CreateAddressDto;
     const nonce = Math.floor(Math.random() * 1000000) + '';
     console.log('address', address, message, signature);
     try {
@@ -102,7 +102,7 @@ export class AuthService {
           );
           if (isValid) {
             // 查到用户，更新nonce, type
-            await this.prisma.$transaction(async (prisma) => {
+            const users = await this.prisma.$transaction(async (prisma) => {
               return await Promise.all([
                 prisma.user.update({
                   where: {
@@ -122,6 +122,10 @@ export class AuthService {
                 }),
               ]);
             });
+            // 入参有邀请码，且用户没被邀请
+            if (referralCode && !users[0]?.referredBy) {
+              this.rewardUser(addressRecord.userId, referralCode);
+            }
             return {
               code: 0,
               msg: 'Login successful',
@@ -146,7 +150,7 @@ export class AuthService {
           );
           if (recoveredAddress.toLowerCase() === address.toLowerCase()) {
             // 查到用户，更新nonce
-            await this.prisma.$transaction(async (prisma) => {
+            const users = await this.prisma.$transaction(async (prisma) => {
               return await Promise.all([
                 prisma.user.update({
                   where: {
@@ -166,6 +170,10 @@ export class AuthService {
                 }),
               ]);
             });
+            // 入参有邀请码，且用户没被邀请
+            if (referralCode && !users[0]?.referredBy) {
+              this.rewardUser(addressRecord.userId, referralCode);
+            }
             return {
               code: 0,
               msg: 'Login successful',
@@ -238,31 +246,7 @@ export class AuthService {
     });
     // 如果有邀请码，将新用户的 referredBy 字段设置为推荐人的 ID
     if (referralCode) {
-      const referrer = await this.prisma.user.findFirst({
-        where: { referralCode }, // 通过referralCode查询邀请人
-      });
-      if (referrer) {
-        await this.prisma.$transaction(async (prisma) => {
-          return await Promise.all([
-            prisma.user.update({
-              where: {
-                id: userId,
-              },
-              data: {
-                referredBy: referrer.id,
-              },
-            }),
-            prisma.referral.create({
-              data: {
-                userId: userId,
-                referralCode,
-                referredBy: referrer.id,
-              },
-            }),
-          ]);
-        });
-        await this.rewardUser(userId, referrer.id); // 奖励邀请人
-      }
+      this.rewardUser(userId, referralCode);
     }
     return {
       code: 0,
@@ -273,15 +257,40 @@ export class AuthService {
       },
     };
   }
-  private async rewardUser(userId: string, referrerId: string) {
-    const rewardAmount = 0; // 具体奖励金额
-    await this.prisma.reward.create({
-      data: {
-        userId: userId,
-        referredBy: referrerId,
-        amount: rewardAmount,
-      },
+  private async rewardUser(userId: string, referralCode: string) {
+    const referrer = await this.prisma.user.findFirst({
+      where: { referralCode }, // 通过referralCode查询邀请人
     });
+    if (referrer) {
+      await this.prisma.$transaction(async (prisma) => {
+        return await Promise.all([
+          prisma.user.update({
+            where: {
+              id: userId,
+            },
+            data: {
+              referredBy: referrer.id,
+            },
+          }),
+          prisma.referral.create({
+            data: {
+              userId: userId,
+              referralCode,
+              referredBy: referrer.id,
+            },
+          }),
+        ]);
+      });
+      // 奖励邀请人
+      const rewardAmount = 0; // 具体奖励金额
+      await this.prisma.reward.create({
+        data: {
+          userId: userId,
+          referredBy: referrer.id,
+          amount: rewardAmount,
+        },
+      });
+    }
   }
   // 生成6位数邀请码
   generateUniqueCode() {
