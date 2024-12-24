@@ -226,7 +226,6 @@ export class AuthService {
   async registerUser(CreateEmailDto: CreateEmailDto) {
     const { email, password, referralCode } = CreateEmailDto;
     const userId = v4();
-    // const referralCode = this.generateUniqueId(); // 生成唯一代码逻辑
     const newUser = await this.prisma.$transaction(async (prisma) => {
       return await Promise.all([
         prisma.user.create({
