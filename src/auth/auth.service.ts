@@ -1,5 +1,9 @@
 import { Injectable, HttpException } from '@nestjs/common';
-import { CreateAddressDto, CreateEmailDto } from './dto/create-auth.dto';
+import {
+  CreateAddressDto,
+  CreateEmailDto,
+  loginEmailDto,
+} from './dto/create-auth.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { v4 } from 'uuid';
 import { ethers } from 'ethers';
@@ -19,6 +23,13 @@ export class AuthService {
     } catch (error) {
       return false;
     }
+  }
+  isValidValue(val) {
+    if (val === null || val === undefined || val === '') {
+      return false;
+    }
+
+    return true;
   }
   // 获取用户noce
   async loginNonce(address: string) {
@@ -219,6 +230,42 @@ export class AuthService {
         code: 0,
         data: userRecord.referralCode,
         msg: 'User ReferralCode',
+      };
+    }
+  }
+  // 邮箱登录
+  async login(loginEmailDto: loginEmailDto) {
+    const { email, password } = loginEmailDto;
+    if (!this.isValidValue(email)) {
+      return {
+        code: 400,
+        msg: 'Please enter your email address',
+      };
+    }
+    if (!this.isValidValue(password)) {
+      return {
+        code: 400,
+        msg: 'Please input a password',
+      };
+    }
+    const user = await this.prisma.account.findUnique({
+      where: { uniqueId: email },
+    });
+    if (!user) {
+      return {
+        code: 400,
+        msg: 'The user was not found',
+      };
+    } else if (user.password !== password) {
+      return {
+        code: 400,
+        msg: 'Your password is incorrect, please try again',
+      };
+    } else {
+      return {
+        code: 0,
+        msg: 'Login successful',
+        data: { token },
       };
     }
   }

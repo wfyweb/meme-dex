@@ -10,7 +10,7 @@ export class SocketService {
   constructor() {
     this.klineSimulator = new KLineSimulator();
     this.klineSimulator.generateKlineData(DURATION, INTERVAL); // 生成初始 K线数据
-    this.startGeneratingKline(); // 开始周期性生成新的 K线数据
+    this.startGeneratingKline(); // 生成新的 K线数据
   }
   onEmit(event: string, data: any, client: Socket) {
     client.emit(event, {
@@ -25,7 +25,8 @@ export class SocketService {
   // 单个 K线数据
   handleKinfo(data: any, client: Socket) {
     setInterval(() => {
-      const latestKline = this.klineSimulator.getKlineData().slice(-1)[0]; // 获取最新的 K线
+      const kine = this.klineSimulator.getKlineData(); // 获取最新的 K线
+      const latestKline = kine[kine.length - 1];
       this.onEmit('kinfo', latestKline, client);
     }, 5000);
   }
@@ -51,7 +52,7 @@ class KLineSimulator {
   generateKlineData(
     duration: number = 3600,
     interval: number = 60,
-    volatility: number = 0.5,
+    volatility: number = 0.1,
   ): Array<object> {
     const data: Array<object> = [];
 
@@ -86,6 +87,7 @@ class KLineSimulator {
     setInterval(() => {
       const lastKline = this.klineData[this.klineData.length - 1];
       const newKline = this.generateNextKline(lastKline);
+      // console.log("🚀 ~ KLineSimulator ~ setInterval ~ newKline:", newKline)
       this.klineData.push(newKline);
     }, interval * 1000);
   }
@@ -102,6 +104,7 @@ class KLineSimulator {
     ); // 新 K线时间为上一 K线时间 + 5s
 
     const open = parseFloat(prevKline.c);
+    // console.log("🚀 ~ KLineSimulator ~ generateNextKline ~ open:", prevKline)
     const high = open * (1 + volatility * Math.random());
     const low = open * (1 - volatility * Math.random());
     const close = low + (high - low) * Math.random();

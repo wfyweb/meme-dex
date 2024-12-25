@@ -32,6 +32,22 @@ export class CreateEmailDto {
   @IsString()
   referralCode?: string; // 可选
 }
+export class loginEmailDto {
+  @ApiProperty({
+    description: '邮箱',
+    example: '1234567890@xx.com',
+    required: false,
+  })
+  @IsString()
+  'email': string;
+  @ApiProperty({
+    description: '密码',
+    example: '',
+    required: false,
+  })
+  @IsString()
+  'password': string;
+}
 
 export class CreateAddressDto {
   @ApiProperty({
