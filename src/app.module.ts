@@ -9,11 +9,11 @@ import { TokenModule } from './token/token.module';
   imports: [
     SequelizeModule.forRoot({
       dialect: 'postgres',
-      host: 'ep-raspy-boat-a5tmzkdx.us-east-2.aws.neon.tech',
-      port: 5432,
-      username: 'neondb_owner',
-      password: 'OaDmjFpn6Ng1',
-      database: 'neondb',
+      host: process.env.DATABASE_HOST,
+      port: parseInt(process.env.DATABASE_PORT) || 5432,
+      username: process.env.DATABASE_USERNAME,
+      password: process.env.DATABASE_PASSWORD,
+      database: process.env.DATABASE_DATABASE,
       ssl: true,
       dialectOptions: {
         ssl: {
