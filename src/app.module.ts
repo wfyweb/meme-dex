@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { TokenModule } from './token/token.module';
+import { SocketModule } from './socket/socket.module';
 @Module({
   imports: [
     SequelizeModule.forRoot({
@@ -27,6 +28,7 @@ import { TokenModule } from './token/token.module';
     PrismaModule,
     AuthModule,
     TokenModule,
+    SocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],
