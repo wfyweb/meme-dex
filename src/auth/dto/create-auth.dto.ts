@@ -42,7 +42,7 @@ export class loginEmailDto {
   'email': string;
   @ApiProperty({
     description: '密码',
-    example: '',
+    example: '123',
     required: false,
   })
   @IsString()

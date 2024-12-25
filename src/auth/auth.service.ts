@@ -259,7 +259,7 @@ export class AuthService {
     } else if (user.password !== password) {
       return {
         code: 400,
-        msg: 'Your password is incorrect, please try again',
+        msg: 'Your password error, please try again',
       };
     } else {
       return {
@@ -273,6 +273,15 @@ export class AuthService {
   async registerUser(CreateEmailDto: CreateEmailDto) {
     const { email, password, referralCode } = CreateEmailDto;
     const userId = v4();
+    const user = await this.prisma.account.findUnique({
+      where: { uniqueId: email },
+    });
+    if (user) {
+      return {
+        code: 400,
+        msg: 'Email already occupied, please re-enter',
+      };
+    }
     const newUser = await this.prisma.$transaction(async (prisma) => {
       return await Promise.all([
         prisma.user.create({
