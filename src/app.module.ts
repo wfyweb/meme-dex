@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { TokenModule } from './token/token.module';
 import { SocketModule } from './socket/socket.module';
+import { HttpModule } from '@nestjs/axios';
 @Module({
   imports: [
     SequelizeModule.forRoot({
@@ -16,12 +17,12 @@ import { SocketModule } from './socket/socket.module';
       password: process.env.DATABASE_PASSWORD,
       database: process.env.DATABASE_DATABASE,
       ssl: true,
-      // dialectOptions: {
-      //   ssl: {
-      //     require: true,
-      //     rejectUnauthorized: false,
-      //   },
-      // },
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      },
       autoLoadModels: true,
       synchronize: true,
     }),
@@ -29,6 +30,7 @@ import { SocketModule } from './socket/socket.module';
     AuthModule,
     TokenModule,
     SocketModule,
+    HttpModule,
   ],
   controllers: [AppController],
   providers: [AppService],

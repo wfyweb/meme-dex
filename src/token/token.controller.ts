@@ -22,6 +22,6 @@ export class TokenController {
   // 创建代表列表，仅用于测试，把假数据导入数据库中
   @Post('/create')
   createToken() {
-    return this.tokenService.createToken();
+    return this.tokenService.addRayToken();
   }
 }
