@@ -16,12 +16,12 @@ import { SocketModule } from './socket/socket.module';
       password: process.env.DATABASE_PASSWORD,
       database: process.env.DATABASE_DATABASE,
       ssl: true,
-      dialectOptions: {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
-      },
+      // dialectOptions: {
+      //   ssl: {
+      //     require: true,
+      //     rejectUnauthorized: false,
+      //   },
+      // },
       autoLoadModels: true,
       synchronize: true,
     }),

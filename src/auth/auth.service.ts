@@ -272,6 +272,18 @@ export class AuthService {
   // 注册账号 邀请码
   async registerUser(CreateEmailDto: CreateEmailDto) {
     const { email, password, referralCode } = CreateEmailDto;
+    if (!this.isValidValue(email)) {
+      return {
+        code: 400,
+        msg: 'Please enter your email address',
+      };
+    }
+    if (!this.isValidValue(password)) {
+      return {
+        code: 400,
+        msg: 'Please input a password',
+      };
+    }
     const userId = v4();
     const user = await this.prisma.account.findUnique({
       where: { uniqueId: email },
