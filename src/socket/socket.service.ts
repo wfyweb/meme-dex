@@ -20,10 +20,12 @@ export class SocketService {
 
   // K线数据
   handleKline(data: any, client: Socket) {
+    console.log("🚀 ~ SocketService ~ handleKline ~ data:", data)
     this.onEmit('kline', this.klineSimulator.getKlineData(), client);
   }
   // 单个 K线数据
   handleKinfo(data: any, client: Socket) {
+    console.log("🚀 ~ SocketService ~ handleKinfo ~ data:", data)
     setInterval(() => {
       const kine = this.klineSimulator.getKlineData(); // 获取最新的 K线
       const latestKline = kine[kine.length - 1];
