@@ -3,7 +3,11 @@ import { CreateRankSwapDto } from './dto/create-token.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { mockToken } from './data';
 import * as dayjs from 'dayjs';
-import { StaticData, DynamicData } from './token.model';
+import {
+  StaticData,
+  DynamicData,
+  StatisticToken,
+} from 'src/sequelize/token.model';
 import { Op, OrderItem } from 'sequelize';
 import { lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
@@ -244,44 +248,39 @@ export class TokenService {
       };
     }
   }
+  // 总计： 12-27 10:00  5565 * 100 = 5564 * 100 + 81 = 556481
   async getRaydiumPolls(
     page: number = 1,
-    pageSize: number = 500,
+    pageSize: number = 1000,
   ): Promise<void> {
-    //  https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=default&sortType=desc&pageSize=200&page=2
     try {
       const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=default&sortType=desc&page=${page}&pageSize=${pageSize}`;
-      // 设置请求头，包括 Cookie 和其他信息
-      const headers = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/plain, */*',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-        Cookie:
-          '__cf_bm=HOJ4ZWDpaon2i.QO91N3RSqXL15CDdkJPKzS7sJjAQc-1735200446-1.0.1.1-8Zl7jUU3BOmkD1wr1xC5.QXHanGY9UGKYk_g9HMgJPXvbpcMJyPLaL.ZFe06XSVGZ3fkDhPUgk1VmexxZc33vA',
-        Referer: 'https://api-v3.raydium.io/doc',
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-        'If-None-Match': 'W/"1dca5-IkpNBXXrhcHLJTyGOC/EWtOzIg4"',
-        'Sec-CH-UA':
-          '"Chromium";v="130", "Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-        'Sec-CH-UA-Mobile': '?0',
-        'Sec-CH-UA-Platform': '"macOS"',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-      };
-      const response = await lastValueFrom(
-        this.httpService.get(url, { headers }),
-      );
+      const response = await lastValueFrom(this.httpService.get(url));
       const { data } = response.data;
-      if (data.length === 0 || !data.hasNextPage) {
-        // 如果没有更多数据，停止递归
+      // 最后一夜记录token长度
+      if (data.length > 0 && !data.hasNextPage) {
+        await StatisticToken.create({
+          id: uuidv4(),
+          page,
+          count: (page - 1) * pageSize + data.length,
+          remark: 'Complete add token log',
+        });
+        console.log("🚀 ~ 'Complete add token log");
         return;
+      }
+      if (data.length === 0 || !data.hasNextPage) {
+        console.log("🚀 ~ 'Complete add token log  data 0");
+        // 如果没有更多数据，停止递归
+        return new Promise((resolve, reject) => {
+          reject({
+            code: 0,
+            message: 'Complete add token log',
+          });
+        });
       }
       // 处理每个 pool 数据并保存到数据库
       const pools = data.data.map((pool) => {
-        let openTimestamp: any = new Date();
+        let openTimestamp: any = null;
         // Check if open_timestamp is a valid date string or a UNIX timestamp
         if (
           typeof pool.open_timestamp === 'string' &&
@@ -291,17 +290,17 @@ export class TokenService {
         } else if (!isNaN(pool.open_timestamp)) {
           openTimestamp = new Date(pool.open_timestamp * 1000).toISOString(); // Convert UNIX timestamp to ISO string
         }
+        // 池子信息
+        const token = pool.mintA.symbol !== 'WSOL' ? pool.mintA : pool.mintB;
         return {
-          id: pool.programId,
+          staticId: uuidv4(),
+          programId: pool.programId,
+          decimals: token.decimals,
+          name: token.name,
+          logo_url: token.logoURI,
           chain: 'sol',
-          address:
-            pool.mintA.symbol !== 'WSOL'
-              ? pool.mintA.address
-              : pool.mintB.address,
-          symbol:
-            pool.mintA.symbol !== 'WSOL'
-              ? pool.mintA.symbol
-              : pool.mintB.symbol,
+          symbol: token.symbol,
+          address: token.address,
           price: pool.price,
           liquidity:
             pool.lpAmount * pool.lpPrice ? pool.lpAmount * pool.lpPrice : 0,
@@ -309,10 +308,11 @@ export class TokenService {
             ? pool.burnPercent / 100
             : pool.burnPercent,
           open_timestamp: openTimestamp,
+          create_address: null,
         };
       });
 
-      await this.poolRepository(page, pools);
+      await this.poolRepository(page, pageSize, pools);
       // 递归调用
       await this.getRaydiumPolls(page + 1);
     } catch (error) {
@@ -328,38 +328,78 @@ export class TokenService {
     }
   }
 
-  async poolRepository(page, pools) {
+  async poolRepository(page, pageSize, pools) {
     console.log(
       '🚀 ~ TokenService ~ poolRepository ~ poolRepository:',
       page,
       pools,
     );
     try {
-      const recordAll = await Promise.all(
-        pools.map(async (pool) => {
-          const staticId = uuidv4();
-          await StaticData.create({
-            id: staticId,
-            chain: pool.chain,
-            symbol: pool.symbol,
-            address: pool.address,
-            open_timestamp: pool.open_timestamp,
-          });
-          await DynamicData.create({
-            id: uuidv4(),
-            staticId: staticId,
-            liquidity: pool.liquidity,
-          });
-          // return { staticId, ...staticData.toJSON(), ...dynamicData.toJSON() };
-        }),
-      );
-      return {
-        code: 0,
-        data: recordAll,
-        total: recordAll.length,
-      };
+      const static_pool = pools.map((pool) => {
+        return {
+          id: pool.staticId,
+          chain: pool.chain,
+          symbol: pool.symbol,
+          name: pool.name,
+          logo_url: pool.logo_url,
+          decimals: pool.decimals,
+          address: pool.address,
+          programId: pool.programId,
+          create_address: pool.create_address,
+          open_timestamp: pool.open_timestamp,
+        };
+      });
+      // console.log("🚀 ~ TokenService ~ conststatic_pool=pools.map ~ static_pool:", static_pool)
+
+      const dynamic_pool = pools.map((pool) => {
+        return {
+          id: uuidv4(),
+          staticId: pool.staticId,
+          liquidity: pool.liquidity,
+        };
+      });
+      // console.log("🚀 ~ TokenService ~ constdynamic_pool=pools.map ~ dynamic_pool:", dynamic_pool)
+
+      await StaticData.bulkCreate(static_pool);
+      await DynamicData.bulkCreate(dynamic_pool);
+      console.log(`poolRepository Complete is page ${page}`);
+
+      // const recordAll = await Promise.all(
+      //   pools.map(async (pool) => {
+      //     const staticId = uuidv4();
+      //     await StaticData.create({
+      //       id: staticId,
+      //       chain: pool.chain,
+      //       symbol: pool.symbol,
+      //       name: pool.name,
+      //       logo_url: pool.logo_url,
+      //       decimals: pool.decimals,
+      //       address: pool.address,
+      //       programId: pool.programId,
+      //       create_address: pool.create_address,
+      //       open_timestamp: pool.open_timestamp,
+      //     });
+      //     await DynamicData.create({
+      //       id: uuidv4(),
+      //       staticId: staticId,
+      //       liquidity: pool.liquidity,
+      //     });
+      //     console.log(`poolRepository Complete is page ${page}`);
+      //     // return { staticId, ...staticData.toJSON(), ...dynamicData.toJSON() };
+      //   }),
+      // );
+      // return {
+      //   code: 0,
+      //   data: recordAll,
+      //   total: recordAll.length,
+      // };
     } catch (error) {
       console.error('Error in poolRepository:', error);
+      await StatisticToken.create({
+        id: uuidv4(),
+        page,
+        remark: `page ${page} pageSize ${pageSize}  Error in poolRepository: ${error}`,
+      });
       return {
         code: 1,
         message: 'Failed to poolRepository tokens.',

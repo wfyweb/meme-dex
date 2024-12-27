@@ -22,6 +22,16 @@ export class StaticData extends Model<StaticData> {
   @Column(DataType.STRING)
   id!: string;
 
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    autoIncrement: true, // 该字段会自增
+  })
+  order!: number; // 自增的顺序字段
+
+  @Column(DataType.STRING)
+  programId!: string;
+
   @Column(DataType.STRING)
   chain!: string;
 
@@ -29,10 +39,19 @@ export class StaticData extends Model<StaticData> {
   symbol!: string;
 
   @Column(DataType.STRING)
+  name!: string;
+
+  @Column(DataType.STRING)
+  logo_url?: string;
+
+  @Column(DataType.INTEGER)
+  decimals?: number;
+
+  @Column(DataType.STRING)
   address!: string;
 
   @Column(DataType.DATE)
-  open_timestamp!: Date;
+  open_timestamp!: Date | null;
 
   @Column(DataType.INTEGER)
   renounced_mint?: number;
@@ -42,6 +61,9 @@ export class StaticData extends Model<StaticData> {
 
   @Column(DataType.STRING)
   burn_status?: string;
+
+  @Column(DataType.STRING)
+  create_address?: string;
 
   @Default(DataType.NOW)
   @Column(DataType.DATE)
@@ -62,7 +84,7 @@ export class StaticData extends Model<StaticData> {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
 })
-export class DynamicData extends Model<DynamicData> {
+export class DynamicData extends Model<DynamicData> { 
   @PrimaryKey
   @Column(DataType.STRING)
   id!: string;
@@ -109,6 +131,36 @@ export class DynamicData extends Model<DynamicData> {
 
   @Column(DataType.DECIMAL(25, 18))
   dev_token_burn_ratio?: number;
+
+  @Default(DataType.NOW)
+  @Column(DataType.DATE)
+  createdAt!: Date;
+
+  @Default(DataType.NOW)
+  @Column(DataType.DATE)
+  updatedAt!: Date;
+}
+
+// StatisticToken 模型
+@Table({
+  tableName: 'statistic_token',
+  timestamps: true,
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+})
+export class StatisticToken extends Model<StatisticToken> {
+  @PrimaryKey
+  @Column(DataType.STRING)
+  id!: string;
+
+  @Column(DataType.INTEGER)
+  page!: number;
+
+  @Column(DataType.INTEGER)
+  count?: number;
+
+  @Column(DataType.STRING)
+  remark?: string;
 
   @Default(DataType.NOW)
   @Column(DataType.DATE)

@@ -3,15 +3,14 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = new DocumentBuilder()
-  .setTitle('MemeDex')
-  .setDescription('MemeDex API')
-  .setVersion('1.0')
-  .addTag('MemeDex')
-  .build();
+    .setTitle('MemeDex')
+    .setDescription('MemeDex API')
+    .setVersion('1.0')
+    .addTag('MemeDex')
+    .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
   app.enableCors();

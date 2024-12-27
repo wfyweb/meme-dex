@@ -359,18 +359,10 @@ export class AuthService {
       });
     }
   }
-  // 生成6位数邀请码
+  // 生成6位数邀请码 8位以上uid
   generateUniqueCode() {
-    const characters =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    const length = 6;
-
-    for (let i = 0; i < length; i++) {
-      const randomIndex = Math.floor(Math.random() * characters.length);
-      result += characters[randomIndex];
-    }
-    return result;
+    const uid = v4();
+    return uid.substring(0, 8);
   }
 
   async getReward(userId: string) {

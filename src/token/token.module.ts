@@ -3,10 +3,16 @@ import { TokenService } from './token.service';
 import { TokenController } from './token.controller';
 import { HttpModule } from '@nestjs/axios';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { StaticData, DynamicData } from './token.model';
+import {
+  StaticData,
+  DynamicData,
+  StatisticToken,
+} from 'src/sequelize/token.model';
 @Module({
-  imports: [SequelizeModule.forFeature([StaticData, DynamicData]), HttpModule], // 确保导入 HttpModule
-  // imports: [SequelizeModule.forFeature([StaticData, DynamicData])],
+  imports: [
+    SequelizeModule.forFeature([StaticData, DynamicData, StatisticToken]),
+    HttpModule,
+  ],
   controllers: [TokenController],
   providers: [TokenService],
 })
