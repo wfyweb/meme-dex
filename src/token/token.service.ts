@@ -261,7 +261,7 @@ export class TokenService {
     }
   }
   // 总计： 12-27 10:00  5565 * 100 = 5564 * 100 + 81 = 556481
-  async getRaydiumPolls(page: number = 13, pageSize: number = 1000) {
+  async getRaydiumPolls(page: number = 1, pageSize: number = 1000) {
     try {
       const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=default&sortType=desc&page=${page}&pageSize=${pageSize}`;
       const response = await lastValueFrom(this.httpService.get(url));
