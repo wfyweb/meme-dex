@@ -44,6 +44,9 @@ export class TokenService {
         attributes: [
           'chain',
           'symbol',
+          'name',
+          'logo_url',
+          'decimals',
           'address',
           'open_timestamp',
           'renounced_mint',
@@ -166,8 +169,8 @@ export class TokenService {
       const _tokens = tokens.map((item) => {
         const { staticData, ...rest } = item.toJSON();
         return {
-          ...rest,
           ...staticData,
+          ...rest,
         };
       });
       const totalCount = await DynamicData.count();
@@ -188,63 +191,63 @@ export class TokenService {
       };
     }
   }
-  async createToken() {
-    try {
-      const recordAll = await Promise.all(
-        mockToken.map(async (mock) => {
-          const staticId = uuidv4();
-          const [staticData, dynamicData] = await Promise.all([
-            StaticData.create({
-              id: staticId,
-              chain: mock.chain,
-              symbol: mock.symbol,
-              address: mock.address,
-              open_timestamp: new Date(mock.open_timestamp * 1000),
-              renounced_mint: mock.renounced_mint,
-              burn_status: mock.burn_status,
-              frozen: mock.renounced_freeze_account,
-            }),
-            DynamicData.create({
-              id: uuidv4(),
-              staticId,
-              liquidity: mock.liquidity,
-              market_cap: mock.market_cap,
-              holder_count: mock.holder_count,
-              price: mock.price,
-              swaps: mock.swaps,
-              volume: mock.volume,
-              sells: mock.sells,
-              buys: mock.buys,
-              distribed: mock.top_10_holder_rate,
-              insider_rate: mock.rat_trader_amount_rate,
-              creator_token_status: mock.creator_token_status,
-              dev_token_burn_ratio: mock.dev_token_burn_ratio,
-            }),
-          ]);
+  // async createToken() {
+  //   try {
+  //     const recordAll = await Promise.all(
+  //       mockToken.map(async (mock) => {
+  //         const staticId = uuidv4();
+  //         const [staticData, dynamicData] = await Promise.all([
+  //           StaticData.create({
+  //             id: staticId,
+  //             chain: mock.chain,
+  //             symbol: mock.symbol,
+  //             address: mock.address,
+  //             open_timestamp: new Date(mock.open_timestamp * 1000),
+  //             renounced_mint: mock.renounced_mint,
+  //             burn_status: mock.burn_status,
+  //             frozen: mock.renounced_freeze_account,
+  //           }),
+  //           DynamicData.create({
+  //             id: uuidv4(),
+  //             staticId,
+  //             liquidity: mock.liquidity,
+  //             market_cap: mock.market_cap,
+  //             holder_count: mock.holder_count,
+  //             price: mock.price,
+  //             swaps: mock.swaps,
+  //             volume: mock.volume,
+  //             sells: mock.sells,
+  //             buys: mock.buys,
+  //             distribed: mock.top_10_holder_rate,
+  //             insider_rate: mock.rat_trader_amount_rate,
+  //             creator_token_status: mock.creator_token_status,
+  //             dev_token_burn_ratio: mock.dev_token_burn_ratio,
+  //           }),
+  //         ]);
 
-          console.log(
-            '🚀 ~ TokenService ~ record ~ record:',
-            staticData.toJSON(),
-            dynamicData.toJSON(),
-          );
-          return { staticId, ...staticData.toJSON(), ...dynamicData.toJSON() };
-        }),
-      );
+  //         console.log(
+  //           '🚀 ~ TokenService ~ record ~ record:',
+  //           staticData.toJSON(),
+  //           dynamicData.toJSON(),
+  //         );
+  //         return { staticId, ...staticData.toJSON(), ...dynamicData.toJSON() };
+  //       }),
+  //     );
 
-      return {
-        code: 0,
-        data: recordAll,
-        total: recordAll.length,
-      };
-    } catch (error) {
-      console.error('Error in createToken:', error);
-      return {
-        code: 1,
-        message: 'Failed to create tokens.',
-        error: error.message || error,
-      };
-    }
-  }
+  //     return {
+  //       code: 0,
+  //       data: recordAll,
+  //       total: recordAll.length,
+  //     };
+  //   } catch (error) {
+  //     console.error('Error in createToken:', error);
+  //     return {
+  //       code: 1,
+  //       message: 'Failed to create tokens.',
+  //       error: error.message || error,
+  //     };
+  //   }
+  // }
   async addRayToken() {
     try {
       await this.getRaydiumPolls();
@@ -258,15 +261,12 @@ export class TokenService {
     }
   }
   // 总计： 12-27 10:00  5565 * 100 = 5564 * 100 + 81 = 556481
-  async getRaydiumPolls(
-    page: number = 1,
-    pageSize: number = 1000,
-  ): Promise<void> {
+  async getRaydiumPolls(page: number = 13, pageSize: number = 1000) {
     try {
       const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=default&sortType=desc&page=${page}&pageSize=${pageSize}`;
       const response = await lastValueFrom(this.httpService.get(url));
       const { data } = response.data;
-      // 最后一夜记录token长度
+      // 最后一页记录token长度
       if (data.length > 0 && !data.hasNextPage) {
         await StatisticToken.create({
           id: uuidv4(),
@@ -325,19 +325,16 @@ export class TokenService {
       // 递归调用
       await this.getRaydiumPolls(page + 1);
     } catch (error) {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          reject({
-            code: 1,
-            message: 'getRaydiumPolls error page is' + page,
-            error: error.message || error,
-          });
-        }, 1000);
-      });
+      return {
+        code: 1,
+        message: 'getRaydiumPolls error page is' + page,
+        error: error,
+      };
     }
   }
 
   async poolRepository(page, pageSize, pools) {
+    console.log("🚀 ~ TokenService ~ poolRepository ~ pools:", pools.length)
     try {
       const static_pool = pools.map((pool) => {
         return {
@@ -364,18 +361,39 @@ export class TokenService {
 
       await StaticData.bulkCreate(static_pool);
       await DynamicData.bulkCreate(dynamic_pool);
-      console.log(`poolRepository Complete is page ${page}`);
-    } catch (error) {
-      console.error('Error in poolRepository:', error);
+      const _remark = {
+        state: 'success',
+        page,
+        pageSize,
+        message: `page ${page} pageSize ${pageSize}  poolRepository Complete is page`,
+      };
       await StatisticToken.create({
         id: uuidv4(),
         page,
-        remark: `page ${page} pageSize ${pageSize}  Error in poolRepository: ${error}`,
+        count: pools.length,
+        remark: JSON.stringify(_remark),
+      });
+      console.log(`poolRepository Complete is page ${page}`);
+      return `poolRepository Complete is page ${page}`;
+    } catch (error) {
+      console.error('Error in poolRepository:', error);
+      const remark = {
+        state: 'error',
+        page,
+        pageSize,
+        message: `Error in poolRepository: ${error}`,
+      };
+      const stateToken = await StatisticToken.create({
+        id: uuidv4(),
+        page,
+        count: pools.length,
+        remark: JSON.stringify(remark),
       });
       return {
-        code: 1,
+        code: 500,
         message: 'Failed to poolRepository tokens.',
         error: error.message || error,
+        stateToken,
       };
     }
   }

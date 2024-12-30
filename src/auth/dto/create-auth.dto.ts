@@ -25,7 +25,7 @@ export class CreateEmailDto {
   'password': string;
   @ApiProperty({
     description: '邀请码',
-    example: 'E80a',
+    example: '4c9b3600',
     required: false,
   })
   @IsOptional()
@@ -76,7 +76,7 @@ export class CreateAddressDto {
   'signature': string;
   @ApiProperty({
     description: '邀请码',
-    example: 'E80a',
+    example: '4c9b3600',
     required: false,
   })
   @IsOptional()
