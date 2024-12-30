@@ -7,6 +7,9 @@ import {
   IsArray,
   IsEnum,
   Matches,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 export class CreateRankSwapDto {
   @ApiProperty({
@@ -170,4 +173,26 @@ export class CreateRankSwapDto {
   @IsOptional()
   @IsNumber()
   max_insider_rate?: number;
+  @ApiProperty({
+    description: '当前页码',
+    required: false,
+    example: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  page: number = 1; // 默认页码为1
+
+  @ApiProperty({
+    description: '每页大小, 最大1000条',
+    required: false,
+    example: 1000,
+    default: 1000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000) // 可根据需要设置最大值
+  pageSize: number = 1000; // 默认每页大小为1000
 }

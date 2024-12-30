@@ -33,6 +33,8 @@ export class TokenService {
       filters,
       min_insider_rate,
       max_insider_rate,
+      page = 1, // 设置默认值
+      pageSize = 1000, // 设置默认值
     } = createRankSwapDto;
 
     const where: any = {};
@@ -150,11 +152,15 @@ export class TokenService {
       }
     }
 
+    const limit = pageSize; // 每页的记录数
+    const offset = (page - 1) * pageSize; // 计算偏移量
     try {
       const tokens = await DynamicData.findAll({
         where,
         include,
         order,
+        limit, // 限制每页的记录数
+        offset, // 从第offset条记录开始
       });
       //  解构出 staticData 和其他属性
       const _tokens = tokens.map((item) => {
@@ -164,10 +170,14 @@ export class TokenService {
           ...staticData,
         };
       });
-
+      const totalCount = await DynamicData.count();
       return {
+        code: 0,
         message: 'Rank swaps fetched successfully',
         data: _tokens,
+        page,
+        pageSize,
+        total: totalCount,
       };
     } catch (error) {
       console.log('🚀 ~ TokenService ~ getRankSwaps ~ error:', error);
@@ -177,7 +187,6 @@ export class TokenService {
         error: error.message || error,
       };
     }
-    // const _tokens = tokens.map((item) => item.toJSON());
   }
   async createToken() {
     try {
@@ -329,11 +338,6 @@ export class TokenService {
   }
 
   async poolRepository(page, pageSize, pools) {
-    console.log(
-      '🚀 ~ TokenService ~ poolRepository ~ poolRepository:',
-      page,
-      pools,
-    );
     try {
       const static_pool = pools.map((pool) => {
         return {
@@ -349,7 +353,6 @@ export class TokenService {
           open_timestamp: pool.open_timestamp,
         };
       });
-      // console.log("🚀 ~ TokenService ~ conststatic_pool=pools.map ~ static_pool:", static_pool)
 
       const dynamic_pool = pools.map((pool) => {
         return {
@@ -358,41 +361,10 @@ export class TokenService {
           liquidity: pool.liquidity,
         };
       });
-      // console.log("🚀 ~ TokenService ~ constdynamic_pool=pools.map ~ dynamic_pool:", dynamic_pool)
 
       await StaticData.bulkCreate(static_pool);
       await DynamicData.bulkCreate(dynamic_pool);
       console.log(`poolRepository Complete is page ${page}`);
-
-      // const recordAll = await Promise.all(
-      //   pools.map(async (pool) => {
-      //     const staticId = uuidv4();
-      //     await StaticData.create({
-      //       id: staticId,
-      //       chain: pool.chain,
-      //       symbol: pool.symbol,
-      //       name: pool.name,
-      //       logo_url: pool.logo_url,
-      //       decimals: pool.decimals,
-      //       address: pool.address,
-      //       programId: pool.programId,
-      //       create_address: pool.create_address,
-      //       open_timestamp: pool.open_timestamp,
-      //     });
-      //     await DynamicData.create({
-      //       id: uuidv4(),
-      //       staticId: staticId,
-      //       liquidity: pool.liquidity,
-      //     });
-      //     console.log(`poolRepository Complete is page ${page}`);
-      //     // return { staticId, ...staticData.toJSON(), ...dynamicData.toJSON() };
-      //   }),
-      // );
-      // return {
-      //   code: 0,
-      //   data: recordAll,
-      //   total: recordAll.length,
-      // };
     } catch (error) {
       console.error('Error in poolRepository:', error);
       await StatisticToken.create({
