@@ -7,7 +7,12 @@ import {
 import { Socket } from 'net';
 import { SocketService } from './socket.service';
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+})
 export class SocketGateway {
   constructor(private readonly socketService: SocketService) {}
 
