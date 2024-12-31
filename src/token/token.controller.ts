@@ -19,6 +19,10 @@ export class TokenController {
   getRankSwaps(@Body() CreateRankSwapDto: CreateRankSwapDto) {
     return this.tokenService.getRankSwaps(CreateRankSwapDto);
   }
+  @Post('/getLastPageTokes')
+  getLastPageTokes() {
+    return this.tokenService.getLastPageTokes();
+  }
   // 创建代表列表，仅用于测试，把假数据导入数据库中
   @Post('/create')
   createToken() {

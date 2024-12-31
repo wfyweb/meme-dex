@@ -192,63 +192,7 @@ export class TokenService {
       };
     }
   }
-  // async createToken() {
-  //   try {
-  //     const recordAll = await Promise.all(
-  //       mockToken.map(async (mock) => {
-  //         const staticId = uuidv4();
-  //         const [staticData, dynamicData] = await Promise.all([
-  //           StaticData.create({
-  //             id: staticId,
-  //             chain: mock.chain,
-  //             symbol: mock.symbol,
-  //             address: mock.address,
-  //             open_timestamp: new Date(mock.open_timestamp * 1000),
-  //             renounced_mint: mock.renounced_mint,
-  //             burn_status: mock.burn_status,
-  //             frozen: mock.renounced_freeze_account,
-  //           }),
-  //           DynamicData.create({
-  //             id: uuidv4(),
-  //             staticId,
-  //             liquidity: mock.liquidity,
-  //             market_cap: mock.market_cap,
-  //             holder_count: mock.holder_count,
-  //             price: mock.price,
-  //             swaps: mock.swaps,
-  //             volume: mock.volume,
-  //             sells: mock.sells,
-  //             buys: mock.buys,
-  //             distribed: mock.top_10_holder_rate,
-  //             insider_rate: mock.rat_trader_amount_rate,
-  //             creator_token_status: mock.creator_token_status,
-  //             dev_token_burn_ratio: mock.dev_token_burn_ratio,
-  //           }),
-  //         ]);
 
-  //         console.log(
-  //           '🚀 ~ TokenService ~ record ~ record:',
-  //           staticData.toJSON(),
-  //           dynamicData.toJSON(),
-  //         );
-  //         return { staticId, ...staticData.toJSON(), ...dynamicData.toJSON() };
-  //       }),
-  //     );
-
-  //     return {
-  //       code: 0,
-  //       data: recordAll,
-  //       total: recordAll.length,
-  //     };
-  //   } catch (error) {
-  //     console.error('Error in createToken:', error);
-  //     return {
-  //       code: 1,
-  //       message: 'Failed to create tokens.',
-  //       error: error.message || error,
-  //     };
-  //   }
-  // }
   async addRayToken() {
     try {
       const totalCount = await DynamicData.count();
@@ -274,29 +218,11 @@ export class TokenService {
       const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=liquidity&sortType=desc&page=${page}&pageSize=${pageSize}`;
       const response = await lastValueFrom(this.httpService.get(url));
       const { data } = response.data;
-      // 最后一页记录token长度
-      if (data?.data.length > 0 && !data.hasNextPage) {
-        const _remark = {
-          isComplete: 1,
-          state: 'success',
-          page,
-          pageSize,
-          message: `Complete add token log`,
-        };
-        await StatisticToken.create({
-          id: uuidv4(),
-          page,
-          count: data.length,
-          remark: JSON.stringify(_remark),
-        });
-        console.log("🚀 ~ 'Complete add token log");
-        return;
-      }
-      if (data?.data.length === 0 || !data.hasNextPage) {
+      if (data?.data.length === 0 && !data.hasNextPage) {
         this.logger.log('🚀 ~ Complete add token log  data 0');
         // 如果没有更多数据，停止递归
         return new Promise((resolve, reject) => {
-          reject({
+          resolve({
             code: 0,
             message: 'Complete add token log',
           });
@@ -311,7 +237,7 @@ export class TokenService {
           !isNaN(Date.parse(pool.openTime))
         ) {
           openTimestamp = new Date(pool.openTime).toISOString(); // or just use pool.open_timestamp if it is already ISO formatted
-        } else if (!isNaN(pool.openTime)) {
+        } else if (!isNaN(Date.parse(pool.openTime))) {
           openTimestamp = new Date(pool.openTime * 1000).toISOString(); // Convert UNIX timestamp to ISO string
         }
         // 池子信息
@@ -336,11 +262,30 @@ export class TokenService {
           create_address: null,
         };
       });
-
+      // 最后一页，检查表里是否已存，未存插入，没存返回
+      if (data?.data.length > 0 && !data.hasNextPage) {
+        await this.checkLastPage(page, pageSize, pools);
+        const _remark = {
+          isComplete: 1,
+          state: 'success',
+          page,
+          pageSize,
+          message: `Complete add token log`,
+        };
+        await StatisticToken.create({
+          id: uuidv4(),
+          page,
+          count: data.length,
+          remark: JSON.stringify(_remark),
+        });
+        this.logger.log("🚀 ~ 'Complete add token log");
+        return;
+      }
       await this.poolRepository(page, pageSize, pools);
       // 递归调用
       await this.getRaydiumPolls(page + 1);
     } catch (error) {
+      this.logger.error('🚀 ~ TokenService ~ getRaydiumPolls ~ error:', error);
       return {
         code: 1,
         message: 'getRaydiumPolls error page is' + page,
@@ -417,12 +362,49 @@ export class TokenService {
       };
     }
   }
+  // 检测最后1000条更新
+  async checkLastPage(page, pageSize, pools) {
+    try {
+      const totalCount = await DynamicData.count();
+      const tokens = await StaticData.findAll({
+        order: [['order', 'DESC']], // 按 order 字段降序排序
+        limit: totalCount % pageSize,
+      });
+      const poolAddressList = new Set(tokens.map((item) => item.pool_address));
+      // 过滤 pools 中的元素，保留其 pool_address 不在 poolAddressList 中的元素
+      const newPools = pools.filter(
+        (item) => !poolAddressList.has(item.pool_address),
+      );
+      console.log(
+        '🚀 ~ TokenService ~ checkLastPage ~ newPools:',
+        newPools.length,
+      );
+      if (newPools.length > 0) {
+        await this.poolRepository(page, pageSize, newPools);
+      }
+    } catch (error) {
+      this.logger.error('🚀 ~ TokenService ~ checkLastPage ~ error:', error);
+    }
+  }
+  async getLastPageTokes() {
+    const totalCount = await DynamicData.count();
+    const tokens = await StaticData.findAll({
+      order: [['order', 'DESC']], // 按 order 字段降序排序
+      limit: totalCount % 1000,
+    });
+    return {
+      code: 0,
+      data: {
+        count: tokens.length,
+        tokens,
+      },
+    };
+  }
 }
-// 写入token函数。 开始page1  pagesize 1000
-//    1: 检查是否上传完成，调用ray 接口总数目前57.5w     5758 * 100 + 54 = 575854 => 12-29 10:00
-//    2 和token表长度比对，小于ray长度，继续上传。
-//    3 计算上传页面如果2w条 继续上传页码 21
-//    4 调用 上传函数，入参 21
-//    5 递归调用
-//    6 上传完成退出
-//
+// 写入token函数。 开始page1  pagesize 1000     ray 接口总数目前57.5w  5758 * 100 + 54 = 575854 => 12-29 10:00
+//    1: 当前库的分页加 1
+//    2  调用上传函数
+//    3  递归调用
+//    4. data长度 大于0，hasNextPage判断是最后一页
+//    5  最后一页检测数据，没有在存入
+//    6. 结束

@@ -54,11 +54,12 @@ export class JobsService {
       // 池子地址，查询池子信息
       //   https://github.com/raydium-io/raydium-sdk-V2/blob/master/src/api/api.ts
       setTimeout(async () => {
+        // 调用v3 get_pools_info_ids 接口
         const data = await raydium.api.fetchPoolById({
-          ids: LPAccount.toBase58(),
+          ids: LPAccount.toBase58(), // 7pNVpfNgpQXcE97jDSw1uJq6ixX2MKanCVCwRHT9gH7p
         });
         this.logger.log('🚀 ~ JobsService ~ setTimeout ~ data:', data);
-        if (data?.length > 0) {
+        if (data?.length > 0 && data[0] !== null) {
           this.setPoolInfo(data);
         }
       }, 10000);
@@ -75,6 +76,8 @@ export class JobsService {
         !isNaN(Date.parse(pool?.openTime))
       ) {
         openTimestamp = new Date(pool.openTime).toISOString(); // or just use pool.open_timestamp if it is already ISO formatted
+      } else if (!isNaN(Date.parse(pool.openTime))) {
+        openTimestamp = new Date(pool.openTime * 1000).toISOString(); // Convert UNIX timestamp to ISO string
       }
       // 池子信息
       const token = pool.mintA.symbol !== 'WSOL' ? pool.mintA : pool.mintB;
