@@ -1,16 +1,221 @@
+import { PoolFetchType } from '@raydium-io/raydium-sdk-v2';
 import { Injectable, Logger } from '@nestjs/common';
-import { Timeout } from '@nestjs/schedule';
+import { Timeout, Cron } from '@nestjs/schedule';
 import { initRaydium, raydiumV4Address } from './config';
 import { v4 as uuidv4 } from 'uuid';
-
-import { StaticData, DynamicData } from 'src/sequelize/token.model';
+import {
+  StaticData,
+  DynamicData,
+  StatisticToken,
+} from 'src/sequelize/token.model';
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
-  //   @Timeout(5000)
-  //   handleTime(){
-  //     this.logger.log('test log 5s');
-  //   }
+  //   @Timeout(3000)
+  @Cron('0 0 * * *') // 每天凌晨0点执行
+  async addRayToken() {
+    this.logger.log('add raydiumCreate data ');
+    try {
+      const totalCount = await DynamicData.count();
+      const page = Math.floor(totalCount / 1000) + 1;
+      this.logger.log(
+        `🚀 ~ TokenService ~ addRayToken ~ totalCount: ${totalCount}, page: ${page}`,
+      );
+      await this.getRaydiumPolls(page, 1000);
+    } catch (error) {
+      console.error('Error in createToken:', error);
+      return {
+        code: 1,
+        message: 'Failed to create tokens.',
+        error: error.message || error,
+      };
+    }
+  }
+  // 总计： 12-27 10:00  5758 * 100 + 54 = 575854
+  async getRaydiumPolls(page: number = 1, pageSize: number = 1000) {
+    try {
+      //   const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=liquidity&sortType=desc&page=${page}&pageSize=${pageSize}`;
+      //   const response = await lastValueFrom(this.httpService.get(url));
+      const raydium = await initRaydium();
+      // 取池子列表
+      const { data, hasNextPage } = await raydium.api.getPoolList({
+        type: PoolFetchType.All,
+        sort: 'liquidity',
+        order: 'desc',
+        pageSize,
+        page,
+      });
+      //   const { data } = response.data;
+      if (data.length === 0 && !hasNextPage) {
+        this.logger.log('🚀 ~ Complete add token log  data 0');
+        // 如果没有更多数据，停止递归
+        return new Promise((resolve) => {
+          resolve({
+            code: 0,
+            message: 'Complete add token log',
+          });
+        });
+      }
+      // 处理每个 pool 数据并保存到数据库
+      const pools = data.map((pool) => {
+        let openTimestamp: any = null;
+        // Check if open_timestamp is a valid date string or a UNIX timestamp
+        if (
+          typeof pool.openTime === 'string' &&
+          !isNaN(Date.parse(pool.openTime))
+        ) {
+          openTimestamp = new Date(pool.openTime).toISOString(); // or just use pool.open_timestamp if it is already ISO formatted
+        } else if (!isNaN(Date.parse(pool.openTime))) {
+          // @ts-ignore
+          openTimestamp = new Date(pool.openTime * 1000).toISOString(); // Convert UNIX timestamp to ISO string
+        }
+        // 池子信息
+        const token = pool.mintA.symbol !== 'WSOL' ? pool.mintA : pool.mintB;
+        return {
+          pool_address: pool.id,
+          staticId: uuidv4(),
+          programId: pool.programId,
+          decimals: token.decimals,
+          name: token.name,
+          logo_url: token.logoURI,
+          chain: 'sol',
+          symbol: token.symbol,
+          address: token.address,
+          price: pool.price,
+          liquidity:
+            // @ts-ignore
+            pool.lpAmount * pool.lpPrice ? pool.lpAmount * pool.lpPrice : 0,
+          burn_ratio: pool.burnPercent
+            ? pool.burnPercent / 100
+            : pool.burnPercent,
+          open_timestamp: openTimestamp,
+          create_address: null,
+        };
+      });
+      // 最后一页，检查表里是否已存，未存插入，没存返回
+      if (data.length > 0 && !hasNextPage) {
+        await this.checkLastPage(page, pageSize, pools);
+        const _remark = {
+          isComplete: 1,
+          state: 'success',
+          page,
+          pageSize,
+          message: `Complete add token log`,
+        };
+        await StatisticToken.create({
+          id: uuidv4(),
+          page,
+          count: data.length,
+          remark: JSON.stringify(_remark),
+        });
+        this.logger.log("🚀 ~ 'Complete add token log");
+        return;
+      }
+      await this.poolRepository(page, pageSize, pools);
+      // 递归调用
+      await this.getRaydiumPolls(page + 1);
+    } catch (error) {
+      this.logger.error('🚀 ~ TokenService ~ getRaydiumPolls ~ error:', error);
+      return {
+        code: 1,
+        message: 'getRaydiumPolls error page is' + page,
+        error: error,
+      };
+    }
+  }
+
+  async poolRepository(page, pageSize, pools) {
+    this.logger.log(
+      '🚀 ~ TokenService ~ poolRepository ~ pools:',
+      pools.length,
+    );
+    try {
+      const static_pool = pools.map((pool) => {
+        return {
+          id: pool.staticId,
+          pool_address: pool.pool_address,
+          chain: pool.chain,
+          symbol: pool.symbol,
+          name: pool.name,
+          logo_url: pool.logo_url,
+          decimals: pool.decimals,
+          address: pool.address,
+          programId: pool.programId,
+          create_address: pool.create_address,
+          open_timestamp: pool.open_timestamp,
+        };
+      });
+
+      const dynamic_pool = pools.map((pool) => {
+        return {
+          id: uuidv4(),
+          staticId: pool.staticId,
+          liquidity: pool.liquidity,
+        };
+      });
+
+      await StaticData.bulkCreate(static_pool);
+      await DynamicData.bulkCreate(dynamic_pool);
+      const _remark = {
+        state: 'success',
+        page,
+        pageSize,
+        message: `page ${page} pageSize ${pageSize}  poolRepository Complete is page`,
+      };
+      await StatisticToken.create({
+        id: uuidv4(),
+        page,
+        count: pools.length,
+        remark: JSON.stringify(_remark),
+      });
+      this.logger.log(`poolRepository Complete is page ${page}`);
+      return `poolRepository Complete is page ${page}`;
+    } catch (error) {
+      console.error('Error in poolRepository:', error);
+      const remark = {
+        state: 'error',
+        page,
+        pageSize,
+        message: `Error in poolRepository: ${error}`,
+      };
+      const stateToken = await StatisticToken.create({
+        id: uuidv4(),
+        page,
+        count: pools.length,
+        remark: JSON.stringify(remark),
+      });
+      return {
+        code: 500,
+        message: 'Failed to poolRepository tokens.',
+        error: error.message || error,
+        stateToken,
+      };
+    }
+  }
+  // 检测最后1000条更新
+  async checkLastPage(page, pageSize, pools) {
+    try {
+      const totalCount = await DynamicData.count();
+      const tokens = await StaticData.findAll({
+        order: [['order', 'DESC']], // 按 order 字段降序排序
+        limit: totalCount % pageSize,
+      });
+      const poolAddressList = new Set(tokens.map((item) => item.pool_address));
+      // 过滤 pools 中的元素，保留其 pool_address 不在 poolAddressList 中的元素
+      const newPools = pools.filter(
+        (item) => !poolAddressList.has(item.pool_address),
+      );
+      console.log(
+        '🚀 ~ TokenService ~ checkLastPage ~ newPools:',
+        newPools.length,
+      );
+      if (newPools.length > 0) {
+        await this.poolRepository(page, pageSize, newPools);
+      }
+    } catch (error) {
+      this.logger.error('🚀 ~ TokenService ~ checkLastPage ~ error:', error);
+    }
+  }
   // 使用 @Timeout
   @Timeout(1000)
   async raydiumCreate() {
