@@ -57,7 +57,10 @@ export class JobsService {
         const data = await raydium.api.fetchPoolById({
           ids: LPAccount.toBase58(),
         });
-        this.setPoolInfo(data);
+        this.logger.log('🚀 ~ JobsService ~ setTimeout ~ data:', data);
+        if (data?.length > 0) {
+          this.setPoolInfo(data);
+        }
       }, 10000);
     } catch (error) {
       this.logger.log('fetchPoolInfo ~ error: ', error);
