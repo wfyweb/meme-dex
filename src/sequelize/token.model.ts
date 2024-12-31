@@ -65,6 +65,9 @@ export class StaticData extends Model<StaticData> {
   @Column(DataType.STRING)
   create_address?: string;
 
+  @Column(DataType.STRING)
+  pool_address?: string;
+  
   @Default(DataType.NOW)
   @Column(DataType.DATE)
   createdAt!: Date;

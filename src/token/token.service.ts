@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CreateRankSwapDto } from './dto/create-token.dto';
 import { v4 as uuidv4 } from 'uuid';
-import { mockToken } from './data';
+// import { mockToken } from './data';
 import * as dayjs from 'dayjs';
 import {
   StaticData,
@@ -14,6 +14,7 @@ import { HttpService } from '@nestjs/axios';
 @Injectable()
 export class TokenService {
   constructor(private httpService: HttpService) {}
+  private readonly logger = new Logger(TokenService.name);
   async getRankSwaps(createRankSwapDto: CreateRankSwapDto) {
     const {
       orderby,
@@ -250,7 +251,14 @@ export class TokenService {
   // }
   async addRayToken() {
     try {
-      await this.getRaydiumPolls();
+      const totalCount = await DynamicData.count();
+      const page = Math.floor(totalCount / 1000) + 1;
+      this.logger.log(
+        '🚀 ~ TokenService ~ addRayToken ~ totalCount:',
+        totalCount,
+        page,
+      );
+      await this.getRaydiumPolls(page, 1000);
     } catch (error) {
       console.error('Error in createToken:', error);
       return {
@@ -260,25 +268,32 @@ export class TokenService {
       };
     }
   }
-  // 总计： 12-27 10:00  5565 * 100 = 5564 * 100 + 81 = 556481
+  // 总计： 12-27 10:00  5758 * 100 + 54 = 575854
   async getRaydiumPolls(page: number = 1, pageSize: number = 1000) {
     try {
-      const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=default&sortType=desc&page=${page}&pageSize=${pageSize}`;
+      const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=liquidity&sortType=desc&page=${page}&pageSize=${pageSize}`;
       const response = await lastValueFrom(this.httpService.get(url));
       const { data } = response.data;
       // 最后一页记录token长度
-      if (data.length > 0 && !data.hasNextPage) {
+      if (data?.data.length > 0 && !data.hasNextPage) {
+        const _remark = {
+          isComplete: 1,
+          state: 'success',
+          page,
+          pageSize,
+          message: `Complete add token log`,
+        };
         await StatisticToken.create({
           id: uuidv4(),
           page,
-          count: (page - 1) * pageSize + data.length,
-          remark: 'Complete add token log',
+          count: data.length,
+          remark: JSON.stringify(_remark),
         });
         console.log("🚀 ~ 'Complete add token log");
         return;
       }
-      if (data.length === 0 || !data.hasNextPage) {
-        console.log("🚀 ~ 'Complete add token log  data 0");
+      if (data?.data.length === 0 || !data.hasNextPage) {
+        this.logger.log('🚀 ~ Complete add token log  data 0');
         // 如果没有更多数据，停止递归
         return new Promise((resolve, reject) => {
           reject({
@@ -292,16 +307,17 @@ export class TokenService {
         let openTimestamp: any = null;
         // Check if open_timestamp is a valid date string or a UNIX timestamp
         if (
-          typeof pool.open_timestamp === 'string' &&
-          !isNaN(Date.parse(pool.open_timestamp))
+          typeof pool.openTime === 'string' &&
+          !isNaN(Date.parse(pool.openTime))
         ) {
-          openTimestamp = new Date(pool.open_timestamp).toISOString(); // or just use pool.open_timestamp if it is already ISO formatted
-        } else if (!isNaN(pool.open_timestamp)) {
-          openTimestamp = new Date(pool.open_timestamp * 1000).toISOString(); // Convert UNIX timestamp to ISO string
+          openTimestamp = new Date(pool.openTime).toISOString(); // or just use pool.open_timestamp if it is already ISO formatted
+        } else if (!isNaN(pool.openTime)) {
+          openTimestamp = new Date(pool.openTime * 1000).toISOString(); // Convert UNIX timestamp to ISO string
         }
         // 池子信息
         const token = pool.mintA.symbol !== 'WSOL' ? pool.mintA : pool.mintB;
         return {
+          pool_address: pool.id,
           staticId: uuidv4(),
           programId: pool.programId,
           decimals: token.decimals,
@@ -334,11 +350,15 @@ export class TokenService {
   }
 
   async poolRepository(page, pageSize, pools) {
-    console.log("🚀 ~ TokenService ~ poolRepository ~ pools:", pools.length)
+    this.logger.log(
+      '🚀 ~ TokenService ~ poolRepository ~ pools:',
+      pools.length,
+    );
     try {
       const static_pool = pools.map((pool) => {
         return {
           id: pool.staticId,
+          pool_address: pool.pool_address,
           chain: pool.chain,
           symbol: pool.symbol,
           name: pool.name,
@@ -373,7 +393,7 @@ export class TokenService {
         count: pools.length,
         remark: JSON.stringify(_remark),
       });
-      console.log(`poolRepository Complete is page ${page}`);
+      this.logger.log(`poolRepository Complete is page ${page}`);
       return `poolRepository Complete is page ${page}`;
     } catch (error) {
       console.error('Error in poolRepository:', error);
@@ -398,3 +418,11 @@ export class TokenService {
     }
   }
 }
+// 写入token函数。 开始page1  pagesize 1000
+//    1: 检查是否上传完成，调用ray 接口总数目前57.5w     5758 * 100 + 54 = 575854 => 12-29 10:00
+//    2 和token表长度比对，小于ray长度，继续上传。
+//    3 计算上传页面如果2w条 继续上传页码 21
+//    4 调用 上传函数，入参 21
+//    5 递归调用
+//    6 上传完成退出
+//

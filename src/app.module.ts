@@ -7,6 +7,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { TokenModule } from './token/token.module';
 import { SocketModule } from './socket/socket.module';
 import { HttpModule } from '@nestjs/axios';
+import { JobsModule } from './jobs/jobs.module';
 @Module({
   imports: [
     SequelizeModule.forRoot({
@@ -31,6 +32,7 @@ import { HttpModule } from '@nestjs/axios';
     TokenModule,
     SocketModule,
     HttpModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
