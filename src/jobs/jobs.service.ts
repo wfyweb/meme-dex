@@ -68,8 +68,8 @@ export class JobsService {
       let openTimestamp: any = null;
       // Check if open_timestamp is a valid date string or a UNIX timestamp
       if (
-        typeof pool.openTime === 'string' &&
-        !isNaN(Date.parse(pool.openTime))
+        typeof pool?.openTime === 'string' &&
+        !isNaN(Date.parse(pool?.openTime))
       ) {
         openTimestamp = new Date(pool.openTime).toISOString(); // or just use pool.open_timestamp if it is already ISO formatted
       }

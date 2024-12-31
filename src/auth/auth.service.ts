@@ -140,7 +140,7 @@ export class AuthService {
             return {
               code: 0,
               msg: 'Login successful',
-              data: { token },
+              data: { token, userId: addressRecord.userId },
             };
           } else {
             throw new HttpException('verify message fail.', 400);
@@ -188,7 +188,7 @@ export class AuthService {
             return {
               code: 0,
               msg: 'Login successful',
-              data: { token },
+              data: { token, userId: addressRecord.userId },
             };
           } else {
             throw new HttpException('verify message fail.', 400);
@@ -265,7 +265,7 @@ export class AuthService {
       return {
         code: 0,
         msg: 'Login successful',
-        data: { token },
+        data: { token, userId: user.id },
       };
     }
   }
