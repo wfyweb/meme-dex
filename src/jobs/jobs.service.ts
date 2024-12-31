@@ -33,29 +33,35 @@ export class JobsService {
   }
 
   async fetchPoolInfo(signature, connection) {
-    // 解析交易的详细信息
-    const tx = await connection.getParsedTransaction(signature, {
-      maxSupportedTransactionVersion: 0,
-      commitment: 'confirmed',
-    });
-    const accounts = tx?.transaction.message.instructions.find((ix) => {
-      return ix.programId.toBase58() === raydiumV4Address;
-    }).accounts;
+    try {
+      // 解析交易的详细信息
+      const tx = await connection.getParsedTransaction(signature, {
+        maxSupportedTransactionVersion: 0,
+        commitment: 'confirmed',
+      });
+      const accounts = tx?.transaction.message.instructions.find((ix) => {
+        return ix.programId.toBase58() === raydiumV4Address;
+      }).accounts;
 
-    if (!accounts) {
-      this.logger.log('No accounts found in the transaction.');
-      return;
+      if (!accounts) {
+        this.logger.log('No accounts found in the transaction.');
+        return;
+      }
+      // 获取池子地址index为4
+      const LPIndex = 4;
+      const LPAccount = accounts[LPIndex];
+      const raydium = await initRaydium();
+      // 池子地址，查询池子信息
+      //   https://github.com/raydium-io/raydium-sdk-V2/blob/master/src/api/api.ts
+      setTimeout(async () => {
+        const data = await raydium.api.fetchPoolById({
+          ids: LPAccount.toBase58(),
+        });
+        this.setPoolInfo(data);
+      }, 10000);
+    } catch (error) {
+      this.logger.log('fetchPoolInfo ~ error: ', error);
     }
-    // 获取池子地址index为4
-    const LPIndex = 4;
-    const LPAccount = accounts[LPIndex];
-    const raydium = await initRaydium();
-    // 池子地址，查询池子信息
-    //   https://github.com/raydium-io/raydium-sdk-V2/blob/master/src/api/api.ts
-    const data = await raydium.api.fetchPoolById({
-      ids: LPAccount.toBase58(),
-    });
-    this.setPoolInfo(data);
   }
   async setPoolInfo(data) {
     const pools = data.map((pool) => {
