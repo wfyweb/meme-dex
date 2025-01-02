@@ -194,15 +194,14 @@ export class TokenService {
   }
 
   async addRayToken() {
+    this.logger.log('add raydiumCreate data ');
     try {
       const totalCount = await DynamicData.count();
       const page = Math.floor(totalCount / 1000) + 1;
       this.logger.log(
-        '🚀 ~ TokenService ~ addRayToken ~ totalCount:',
-        totalCount,
-        page,
+        `🚀 ~ TokenService ~ addRayToken ~ totalCount: ${totalCount}, page: ${page}`,
       );
-      await this.getRaydiumPolls(page, 1000);
+      await this.getRaydiumPolls(page, 1000, totalCount);
     } catch (error) {
       console.error('Error in createToken:', error);
       return {
@@ -212,24 +211,28 @@ export class TokenService {
       };
     }
   }
-  // 总计： 12-27 10:00  5758 * 100 + 54 = 575854
-  async getRaydiumPolls(page: number = 1, pageSize: number = 1000) {
+  // 取ray池子
+  async getRaydiumPolls(
+    page: number = 1,
+    pageSize: number = 1000,
+    totalCount: number,
+  ) {
     try {
       const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=liquidity&sortType=desc&page=${page}&pageSize=${pageSize}`;
       const response = await lastValueFrom(this.httpService.get(url));
       const { data } = response.data;
       if (data?.data.length === 0 && !data.hasNextPage) {
-        this.logger.log('🚀 ~ Complete add token log  data 0');
+        this.logger.log('🚀 ~ invalid pool');
         // 如果没有更多数据，停止递归
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           resolve({
             code: 0,
-            message: 'Complete add token log',
+            message: 'invalid pool',
           });
         });
       }
       // 处理每个 pool 数据并保存到数据库
-      const pools = data.data.map((pool) => {
+      let pools = data.data.map((pool) => {
         let openTimestamp: any = null;
         // Check if open_timestamp is a valid date string or a UNIX timestamp
         if (
@@ -264,7 +267,10 @@ export class TokenService {
       });
       // 最后一页，检查表里是否已存，未存插入，没存返回
       if (data?.data.length > 0 && !data.hasNextPage) {
-        await this.checkLastPage(page, pageSize, pools);
+        const newPools = await this.checkLastPage(totalCount, pageSize, pools);
+        if (newPools.length > 0) {
+          await this.poolRepository(page, pageSize, newPools);
+        }
         const _remark = {
           isComplete: 1,
           state: 'success',
@@ -280,10 +286,19 @@ export class TokenService {
         });
         this.logger.log("🚀 ~ 'Complete add token log");
         return;
+        // 当前表最后一页有数据，进行过滤插入
+      } else {
+        // 计算总页数
+        const totalPages = Math.ceil(totalCount / pageSize);
+        // 检查当前页是否是最后一页
+        const isLastPage = page === totalPages && totalCount % pageSize > 0;
+        if (isLastPage) {
+          pools = await this.checkLastPage(totalCount, pageSize, pools);
+        }
       }
       await this.poolRepository(page, pageSize, pools);
       // 递归调用
-      await this.getRaydiumPolls(page + 1);
+      await this.getRaydiumPolls(page + 1, pageSize, totalCount + pools.length);
     } catch (error) {
       this.logger.error('🚀 ~ TokenService ~ getRaydiumPolls ~ error:', error);
       return {
@@ -299,6 +314,7 @@ export class TokenService {
       '🚀 ~ TokenService ~ poolRepository ~ pools:',
       pools.length,
     );
+    if (pools.length === 0) return;
     try {
       const static_pool = pools.map((pool) => {
         return {
@@ -362,10 +378,10 @@ export class TokenService {
       };
     }
   }
-  // 检测最后1000条更新
-  async checkLastPage(page, pageSize, pools) {
+  // 检测最后一页数据，过滤重复数据
+  async checkLastPage(totalCount, pageSize, pools) {
+    console.log("🚀 ~ TokenService ~ checkLastPage ~ totalCount, pageSize:", totalCount, pageSize)
     try {
-      const totalCount = await DynamicData.count();
       const tokens = await StaticData.findAll({
         order: [['order', 'DESC']], // 按 order 字段降序排序
         limit: totalCount % pageSize,
@@ -375,13 +391,11 @@ export class TokenService {
       const newPools = pools.filter(
         (item) => !poolAddressList.has(item.pool_address),
       );
-      console.log(
-        '🚀 ~ TokenService ~ checkLastPage ~ newPools:',
+      this.logger.log(
+        '🚀 ~ JobsService ~ checkLastPage ~ newPools:',
         newPools.length,
       );
-      if (newPools.length > 0) {
-        await this.poolRepository(page, pageSize, newPools);
-      }
+      return newPools;
     } catch (error) {
       this.logger.error('🚀 ~ TokenService ~ checkLastPage ~ error:', error);
     }
@@ -402,9 +416,9 @@ export class TokenService {
   }
 }
 // 写入token函数。 开始page1  pagesize 1000     ray 接口总数目前57.5w  5758 * 100 + 54 = 575854 => 12-29 10:00
-//    1: 当前库的分页加 1
+//    1: 当前库的分页加 1   // 105 page 10 pagesize 10 => page 11
 //    2  调用上传函数
 //    3  递归调用
-//    4. data长度 大于0，hasNextPage判断是最后一页
-//    5  最后一页检测数据，没有在存入
-//    6. 结束
+//    4  最有一页
+//    4.1. 检测Ray最后一页数据，求差集存入, 结束
+//    4.2  检测表最后一页数据，求差集存入，继续递归

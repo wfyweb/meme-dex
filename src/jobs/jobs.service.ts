@@ -21,7 +21,7 @@ export class JobsService {
       this.logger.log(
         `🚀 ~ TokenService ~ addRayToken ~ totalCount: ${totalCount}, page: ${page}`,
       );
-      await this.getRaydiumPolls(page, 1000);
+      await this.getRaydiumPolls(page, 1000, totalCount);
     } catch (error) {
       console.error('Error in createToken:', error);
       return {
@@ -31,11 +31,13 @@ export class JobsService {
       };
     }
   }
-  // 总计： 12-27 10:00  5758 * 100 + 54 = 575854
-  async getRaydiumPolls(page: number = 1, pageSize: number = 1000) {
+  // 取ray池子
+  async getRaydiumPolls(
+    page: number = 1,
+    pageSize: number = 1000,
+    totalCount: number,
+  ) {
     try {
-      //   const url = `https://api-v3.raydium.io/pools/info/list?poolType=all&poolSortField=liquidity&sortType=desc&page=${page}&pageSize=${pageSize}`;
-      //   const response = await lastValueFrom(this.httpService.get(url));
       const raydium = await initRaydium();
       // 取池子列表
       const { data, hasNextPage } = await raydium.api.getPoolList({
@@ -45,19 +47,18 @@ export class JobsService {
         pageSize,
         page,
       });
-      //   const { data } = response.data;
       if (data.length === 0 && !hasNextPage) {
-        this.logger.log('🚀 ~ Complete add token log  data 0');
-        // 如果没有更多数据，停止递归
+        this.logger.log('🚀 ~ invalid pool');
+        // 没有数据，停止递归
         return new Promise((resolve) => {
           resolve({
             code: 0,
-            message: 'Complete add token log',
+            message: 'invalid pool',
           });
         });
       }
       // 处理每个 pool 数据并保存到数据库
-      const pools = data.map((pool) => {
+      let pools = data.map((pool) => {
         let openTimestamp: any = null;
         // Check if open_timestamp is a valid date string or a UNIX timestamp
         if (
@@ -94,7 +95,10 @@ export class JobsService {
       });
       // 最后一页，检查表里是否已存，未存插入，没存返回
       if (data.length > 0 && !hasNextPage) {
-        await this.checkLastPage(page, pageSize, pools);
+        const newPools = await this.checkLastPage(totalCount, pageSize, pools);
+        if (newPools.length > 0) {
+          await this.poolRepository(page, pageSize, newPools);
+        }
         const _remark = {
           isComplete: 1,
           state: 'success',
@@ -110,10 +114,20 @@ export class JobsService {
         });
         this.logger.log("🚀 ~ 'Complete add token log");
         return;
+        // 当前表最后一页有数据，进行过滤插入
+      } else {
+        // 计算总页数
+        const totalPages = Math.ceil(totalCount / pageSize);
+        // 检查当前页是否是最后一页
+        const isLastPage = page === totalPages && totalCount % pageSize > 0;
+        if (isLastPage) {
+          pools = await this.checkLastPage(totalCount, pageSize, pools);
+        }
       }
+
       await this.poolRepository(page, pageSize, pools);
       // 递归调用
-      await this.getRaydiumPolls(page + 1);
+      await this.getRaydiumPolls(page + 1, pageSize, totalCount + pools.length);
     } catch (error) {
       this.logger.error('🚀 ~ TokenService ~ getRaydiumPolls ~ error:', error);
       return {
@@ -129,6 +143,7 @@ export class JobsService {
       '🚀 ~ TokenService ~ poolRepository ~ pools:',
       pools.length,
     );
+    if (pools.length === 0) return;
     try {
       const static_pool = pools.map((pool) => {
         return {
@@ -192,12 +207,11 @@ export class JobsService {
       };
     }
   }
-  // 检测最后1000条更新
-  async checkLastPage(page, pageSize, pools) {
+  // 检测最后一页数据，过滤重复数据
+  async checkLastPage(totalCount, pageSize, pools) {
     try {
-      const totalCount = await DynamicData.count();
       const tokens = await StaticData.findAll({
-        order: [['order', 'DESC']], // 按 order 字段降序排序
+        order: [['order', 'DESC']], // 按 order 字段降序，最大在前面
         limit: totalCount % pageSize,
       });
       const poolAddressList = new Set(tokens.map((item) => item.pool_address));
@@ -205,13 +219,11 @@ export class JobsService {
       const newPools = pools.filter(
         (item) => !poolAddressList.has(item.pool_address),
       );
-      console.log(
-        '🚀 ~ TokenService ~ checkLastPage ~ newPools:',
+      this.logger.log(
+        '🚀 ~ JobsService ~ checkLastPage ~ newPools:',
         newPools.length,
       );
-      if (newPools.length > 0) {
-        await this.poolRepository(page, pageSize, newPools);
-      }
+      return newPools;
     } catch (error) {
       this.logger.error('🚀 ~ TokenService ~ checkLastPage ~ error:', error);
     }
