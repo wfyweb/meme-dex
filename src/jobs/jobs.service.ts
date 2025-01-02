@@ -137,7 +137,7 @@ export class JobsService {
       };
     }
   }
-
+  // 池子数据存入token表
   async poolRepository(page, pageSize, pools) {
     this.logger.log(
       '🚀 ~ TokenService ~ poolRepository ~ pools:',
@@ -278,6 +278,20 @@ export class JobsService {
         this.logger.log('🚀 ~ JobsService ~ setTimeout ~ data:', data);
         if (data?.length > 0 && data[0] !== null) {
           this.setPoolInfo(data);
+          // 记录新增失败的池子
+        } else {
+          const _remark = {
+            isComplete: 0,
+            state: 'await',
+            pool_address: LPAccount.toBase58(),
+            message: `await pool address add token`,
+          };
+          await StatisticToken.create({
+            id: uuidv4(),
+            page: 0,
+            count: 1,
+            remark: JSON.stringify(_remark),
+          });
         }
       }, 10000);
     } catch (error) {
@@ -345,8 +359,46 @@ export class JobsService {
       };
     });
 
-    await StaticData.bulkCreate(static_pool);
+    const staticData = await StaticData.bulkCreate(static_pool);
     await DynamicData.bulkCreate(dynamic_pool);
     this.logger.log('add pool address: ', data[0]?.id);
+    return staticData;
+  }
+  // @Timeout(5000)
+  @Cron('0 * * * *') // 每小时的第0分钟执行
+  async handleCron() {
+    const awiteTokens = await StatisticToken.findAll({
+      where: {
+        page: 0,
+      },
+    });
+    const poolAddress = awiteTokens
+      .map((item) => {
+        const { pool_address = null, state = '' } = JSON.parse(item.remark);
+        if (state === 'await') {
+          return pool_address;
+        }
+      })
+      .filter(Boolean);
+    try {
+      const raydium = await initRaydium(); // 8uUAtLoSstn26cWCKcNf1yVvTGzStwn1nGLvunP1HYV6，7pNVpfNgpQXcE97jDSw1uJq6ixX2MKanCVCwRHT9gH7p
+      const data = await raydium.api.fetchPoolById({
+        ids: poolAddress.join(','),
+      });
+      // this.logger.log('🚀 ~ JobsService ~ handleCron ~ data:', data);
+      if (data?.length > 0 && data[0] !== null) {
+        const staticData = await this.setPoolInfo(data);
+        if (staticData.length > 0) {
+          const ids = awiteTokens.map((item) => item.id);
+          await StatisticToken.destroy({
+            where: {
+              id: ids,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('🚀 ~ JobsService ~ handleCron ~ error:', error);
+    }
   }
 }
